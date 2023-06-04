@@ -1,0 +1,12 @@
+services:
+  website1:
+    build: .
+    command: python script.py
+  website2:
+    build: .
+    command: python script.py
+  website3:
+    build: .
+    command: python script.py
+  
+

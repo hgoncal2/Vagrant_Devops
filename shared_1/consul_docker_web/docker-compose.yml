@@ -1,0 +1,26 @@
+services:
+  website1:
+    build: ./Website1
+    ports:
+    - "5001:5000"
+    command: python WebSite1.py
+  website2:
+    build: ./Website2
+    ports:
+    - "5002:5000"
+    command: python WebSite2.py
+  website3:
+    build: ./Website3
+    ports: 
+    - "5003:5000"  
+    command: python WebSite3.py
+  nginx:
+    build: ./nginx
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+    depends_on:
+    - website1
+    - website2
+    - website3

@@ -1,0 +1,12 @@
+services:
+  web1:
+    build: ./Website1
+    ports:
+      - "80:5000"
+    command: python Website1.py
+    networks:
+            - network1
+networks:
+        network1:
+                name: br0
+                external: true

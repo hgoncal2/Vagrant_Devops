@@ -1,0 +1,1 @@
+log_format custom_log '"Request: \n Status: \n Request_URI: \n Host: \n Client_IP: \n Proxy_IP(s): \n Proxy_Hostname: \n Real_IP: \n User_Client: "';

@@ -1,0 +1,23 @@
+log_format custom_log '"Request: \n Status: \n Request_URI: \n Host: \n Client_IP: \n Proxy_IP(s): \n Proxy_Hostname: \n Real_IP: \n User_Client: "';
+
+upstream loadbalancer{
+        
+        
+        #worker
+        
+}
+server {
+        access_log /var/log/nginx/custom-access-logs.log custom_log;
+
+
+        location / {
+                proxy_pass http://loadbalancer;
+        }
+
+        location /nginx_status {
+        # Turn on stats
+        stub_status on;
+        access_log   off;
+        allow all;
+   }
+}

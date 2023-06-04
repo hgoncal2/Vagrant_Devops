@@ -1,0 +1,19 @@
+[Unit]
+Description="Consul Template daemon for lab 7"
+Requires=consul.service
+After=consul.service
+StartLimitIntervalSec=60
+
+[Service]
+WorkingDirectory=/etc/consul.d/
+ExecStart=/etc/consul.d/consul-template -config=/etc/consul.d/config_consul_templt/consul-template-config.hcl
+TimeoutStartSec=10
+Restart=on-failure
+StartLimitBurst=3
+ExecReload=/bin/kill --signal SIGHUP $MAINPID
+KillMode=process
+KillSignal=SIGINT
+
+
+[Install]
+WantedBy=multi-user.target
