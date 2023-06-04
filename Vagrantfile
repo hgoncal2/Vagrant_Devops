@@ -48,7 +48,7 @@ config.vm.provision :docker do |d| # Usa a provision de docker para facilitar in
 
   config.vm.provider "virtualbox" do |vb| #especifica virtualbox como provider
         vb.memory = "512" #define a memória base da VM
-        vb.cpus = "1" #define número de CPUs da VM
+        vb.cpus = "2" #define número de CPUs da VM
         vb.customize ["modifyvm", :id, "--nataliasmode1", "proxyonly"]
     end
 	
