@@ -1,0 +1,4 @@
+#!/bin/bash
+
+str=`cat  output.txt | grep 2377`
+$str

@@ -1,0 +1,55 @@
+#Definições de variáveis
+NUM_WORKER=2
+IP_NW="192.168.10."
+IP_START=2
+#port=2523
+#------------------------------------------------------------------------#
+Vagrant.configure("2") do |config|
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.synced_folder "shared/", "/etc/shared" 
+  config.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+      apt-get update -y #corre comando para dar update às packages
+      echo "$IP_NW$((IP_START)) master" >> /etc/hosts
+      
+  SHELL
+ (1..NUM_WORKER).each do |i|
+config.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+      echo "$IP_NW$((IP_START+#{i})) worker#{i}" >> /etc/hosts
+  SHELL
+end
+config.vm.provision :docker do |d| # Usa a provision de docker para facilitar instalação e configurações desta
+        d.post_install_provision "shell" , inline:" sudo systemctl enable docker.service; sudo systemctl enable containerd.service;" #Inicia docker em boot
+  end
+
+  
+  config.vm.box = "bento/ubuntu-20.04" #define imagem a ser usada
+  
+  config.vm.box_check_update = true #verifica se existem novos updates à imagem
+
+  config.vm.provider "virtualbox" do |vb| #especifica virtualbox como provider
+        vb.memory = "512" #define a memória base da VM
+        vb.cpus = "1" #define número de CPUs da VM
+    end
+	
+
+ config.vm.define "master" do |master| #criação da VM master
+    master.vm.hostname="master" #define hostname da VM
+    master.vm.network "private_network", ip: IP_NW + "#{IP_START}" # Define para usar private network e configura endereço IP
+    master.vm.provision "shell",env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL "docker volume create portainer_data;docker run -d -p 9443:9443 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest; iptables -A INPUT -p tcp --dport 2377 -j ACCEPT; iptables -A OUTPUT -p tcp --sport 2377 -j ACCEPT; docker swarm init --advertise-addr $IP_NW$((IP_START)) > /etc/shared/output.txt"
+ SHELL
+end
+  (1..NUM_WORKER).each do |i| # ciclo for para criar cada VM worker
+
+  config.vm.define "worker#{i}" do |worker|
+    worker.vm.hostname = "worker#{i}" # define hostname da VM
+    worker.vm.network "private_network", ip: IP_NW + "#{IP_START+i}" # Define para usar private network e configura endereço IP
+    worker.vm.provision "shell", inline: <<-SHELL #abre shell
+    /etc/shared/swarm_join.csh
+  SHELL
+  end
+  
+    
+  end
+end
