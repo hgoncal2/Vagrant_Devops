@@ -1,0 +1,72 @@
+#Definições de variáveis
+NUM_WORKER=4
+IP_NW="192.168.10."
+IP_START=2
+#port=2523
+#------------------------------------------------------------------------#
+Vagrant.configure("2") do |config|
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+ # config.vm.network "forwarded_port", guest: 8500, host: 8500
+  config.vm.synced_folder "../shared_1/", "/etc/shared" 
+  config.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+      apt-get update -y #corre comando para dar update às packages
+      echo "$IP_NW$((IP_START)) master" >> /etc/hosts  #adiciona hostname do master ao ficheiro de hosts
+      echo "$IP_NW$((IP_START)) master" > /etc/shared/ip_v.txt  
+SHELL
+  
+  config.vm.provision :docker do |d| # Usa a provision de docker para facilitar instalação e configurações desta
+        d.post_install_provision "shell" , inline:" sudo systemctl enable docker.service; sudo systemctl enable containerd.service;" #Inicia docker em boot
+  end
+  (1..NUM_WORKER).each do |i|
+  config.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+        echo "$IP_NW$((IP_START+#{i})) worker#{i}" >> /etc/hosts #adiciona hostname dos workers ao ficheiro de hosts
+	echo "$IP_NW$((IP_START+#{i})) worker#{i}" >> /etc/shared/ip_v.txt    
+SHELL
+  end
+  
+  config.vm.box = "bento/ubuntu-20.04" #define imagem a ser usada
+  
+  config.vm.box_check_update = true #verifica se existem novos updates à imagem
+
+  config.vm.provider "virtualbox" do |vb| #especifica virtualbox como provider
+        vb.memory = "1024" #define a memória base da VM
+        vb.cpus = "1" #define número de CPUs da VM
+    end
+	
+
+   config.vm.define "master" do |master| #criação da VM master
+      master.vm.hostname="master" #define hostname da VM
+      master.vm.network "private_network", ip: IP_NW + "#{IP_START}" # Define para usar private network e configura endereço IP 
+      master.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+        apt install nginx -y #instala nginx
+        rm -f /etc/nginx/conf.d/default.conf #remove ficheiro de conf. default se já houver
+        cp  /etc/shared/default.conf /etc/nginx/conf.d/default.conf #copia conf. template da pasta partilhada para a vm
+	cp  /etc/shared/nginx.conf /etc/nginx/nginx.conf #copia conf. template do nginx para a vm
+      SHELL
+      
+      (1..NUM_WORKER).each do |i|
+          master.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+            sudo gawk -i inplace '/worker/ && !x {print "\tserver worker#{i}:80;"; x=1} 1' /etc/nginx/conf.d/default.conf #adiciona servidor dos workers ao ficheiro de conf. nginx
+          SHELL
+      end
+      master.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+        service nginx reload #dá reload do serviço nginx para a nova configuração fazer efeito
+      SHELL
+end
+ 
+
+    (1..NUM_WORKER).each do |i| # ciclo for para criar cada VM worker
+      config.vm.define "worker#{i}" do |worker|
+        worker.vm.hostname = "worker#{i}" # define hostname da VM
+        worker.vm.network "private_network", ip: IP_NW + "#{IP_START+i}" # Define para usar private network e configura endereço IP
+        worker.vm.provision "shell", env: {"IP_NW" => IP_NW, "IP_START" => IP_START}, inline: <<-SHELL #abre shell
+          cp -r /etc/shared/consul_docker_web/web0/ ~/web#{i}/ #prepara os ficheiros que irão ser usados no docker compose,indo-os buscar à pasta partilhada
+          cd ~/web#{i} #mude de diretoria,onde vai ser iniciado o projeto compose
+          sed -i 's/one/#{i}/g' Website1/Website1.py #muda a página web para demonstrar o número do servidor
+          docker network create --driver=bridge --subnet=192.190.0.0/24 br0 #cria uma network de docker.Isto é preciso porque havia conflitos com os endereços IPs atribuidos por default e ssh.
+          docker compose up -d #incia docker compose em background
+        SHELL
+      end
+    end
+end
